@@ -1,5 +1,4 @@
 # coding: utf-8
-
 from leancloud import Object
 from leancloud import Query
 from leancloud import LeanCloudError
