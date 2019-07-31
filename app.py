@@ -80,6 +80,11 @@ def index():
 def users():
     return app.send_static_file('html/users.html')
 
+@app.route('/groups')
+@login_required
+def groups():
+    return app.send_static_file('html/groups.html')
+
 
 @app.route('/time')
 def time():
@@ -216,6 +221,44 @@ def apiUsers():
         user.set('mobilePhoneNumber',mobilePhoneNumber)
         try:
             user.save()
+        except LeanCloudError as e:
+            raise BadGateway(e.error, e.code)
+        else:
+            return jsonify(success=True)
+
+@app.route('/api/groups', methods=['GET', 'POST'])
+@login_required
+def apiGroups():
+    if request.method == 'GET':
+        try:
+            result_list = leancloud.Query(leancloud.Object.extend(
+                'Group')).descending('updatedAt').limit(1000).find()
+        except LeanCloudError as e:
+            if e.code == 101:  # 服务端对应的 Class 还没创建
+                return jsonify([])
+            else:
+                raise BadGateway(e.error, e.code)
+        else:
+            return jsonify([item.dump() for item in result_list])
+    elif request.method == 'POST':
+        try:
+            #content = request.get_json()['content']
+            print(request.get_json())
+            objectId = request.get_json()['objectId']
+            name = request.get_json()['name']
+        except KeyError:
+            raise BadRequest(
+                '''receives malformed POST content (proper schema: '{"content": "TODO CONTENT"}')''') 
+        if len(objectId)>0:
+            #leancloud.init("JdgetNRNLj7wvSs7wYs1hlNF-gzGzoHsz", master_key="bnPlVUIFezts6FwXmFPF0iHk")
+            Item = leancloud.Object.extend('Group')
+            query = Item.query
+            item = query.get(objectId)
+        else :
+            item = leancloud.Object.extend('Group')()
+        item.set('name',name)
+        try:
+            item.save()
         except LeanCloudError as e:
             raise BadGateway(e.error, e.code)
         else:

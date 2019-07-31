@@ -14,7 +14,7 @@
   <div id="container">
     <h1><script src="/static/nav.js"></script></h1>
     <form action="/todos" method="POST">
-      <input type="button" value="add user" onclick='javascript:openAddNewUser()' />
+      <input type="button" value="add" onclick='javascript:openAddNew()' />
     </form>
     <ul>
       <el-table v-loading="loading" id="t1" :data="tableData" highlight-current-row @current-change="handleCurrentChange"
@@ -23,31 +23,25 @@
         </el-table-column>
         <el-table-column prop="updatedAt.iso" label="更新日期">
         </el-table-column>
-        <el-table-column prop="username" label="用户名">
-        </el-table-column>
-        <el-table-column prop="mobilePhoneNumber" label="手机">
+        <el-table-column prop="name" label="名称">
         </el-table-column>
       </el-table>
     </ul>
     <ul>
 
     </ul>
-    <el-dialog id='d1' title="用户" :visible.sync="dialogFormVisible">
+    <el-dialog id='d1' title="group" :visible.sync="dialogFormVisible">
       <el-form :model="form">
-        <el-form-item label="用户名" :label-width="formLabelWidth">
-          <el-input v-model="form.username" autocomplete="off"></el-input>
-        </el-form-item>
-        <el-form-item label="手机号" :label-width="formLabelWidth">
-          <el-input v-model="form.mobilePhoneNumber" autocomplete="off"></el-input>
+        <el-form-item label="名称" :label-width="formLabelWidth">
+          <el-input v-model="form.name" autocomplete="off"></el-input>
         </el-form-item>
         <el-form-item label="id" v-if="form.objectId" :label-width="formLabelWidth">
           <el-input v-model="form.objectId" disabled></el-input>
         </el-form-item>
-
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button @click="dialogFormVisible = false">取 消</el-button>
-        <el-button type="primary" @click="handleSubmitUser">确 定</el-button>
+        <el-button type="primary" @click="handleSubmit">确 定</el-button>
       </div>
     </el-dialog>
 
@@ -62,8 +56,7 @@
       methods: {
         handleCurrentChange(val) {
           console.log(val)
-          d1.form.username = val.username
-          d1.form.mobilePhoneNumber = val.mobilePhoneNumber
+          d1.form.name = val.name
           d1.form.objectId = val.objectId
           d1.dialogFormVisible = true
         }
@@ -88,13 +81,12 @@
         formLabelWidth: '120px'
       },
       methods: {
-        handleSubmitUser() {
-
+        handleSubmit() {
           console.log(d1.form)
           console.log(JSON.stringify(d1.form))
           axios({
             method: 'post',
-            url: '/api/users',
+            url: '/api/groups',
             data: JSON.stringify(d1.form),
             headers:
             {
@@ -103,7 +95,7 @@
           }).then(resp => {
             console.log(resp.data);
             d1.dialogFormVisible = false
-            loadUsers()
+            loadData()
           }).catch(err => {
             console.log('请求失败：' + err.status + ',' + err.statusText);
           });
@@ -111,21 +103,20 @@
       }
     })
 
-    function openAddNewUser() {
-      d1.form.username = ''
-      d1.form.mobilePhoneNumber = ''
+    function openAddNew() {
+      d1.form.name = ''
       d1.form.objectId = ''
       d1.dialogFormVisible = true
     }
 
     window.onload = function () {
-      loadUsers();
+      loadData();
     }
-    function loadUsers(){
+    function loadData(){
       t1.loading=true;
       axios({
         method: 'get',
-        url: '/api/users'
+        url: '/api/groups'
       }).then(function (resp) {
         console.log(resp.data);
         t1.tableData = resp.data
