@@ -55,7 +55,7 @@ def login():
 
             # 通过Flask-Login的login_user方法登录用户
             login_user(curr_user)
-            return redirect(url_for('index'))
+            return redirect(url_for('users'))
         flash('Wrong username or password!')
 
     # GET 请求
@@ -73,17 +73,6 @@ def logout():
 @login_required
 def index():
     return render_template('index.html')
-
-
-@app.route('/users')
-@login_required
-def users():
-    return app.send_static_file('html/users.html')
-
-@app.route('/groups')
-@login_required
-def groups():
-    return app.send_static_file('html/groups.html')
 
 
 @app.route('/time')
@@ -208,23 +197,24 @@ def apiUsers():
             mobilePhoneNumber = request.get_json()['mobilePhoneNumber']
         except KeyError:
             raise BadRequest(
-                '''receives malformed POST content (proper schema: '{"content": "TODO CONTENT"}')''') 
-        if len(objectId)>0:
+                '''receives malformed POST content (proper schema: '{"content": "TODO CONTENT"}')''')
+        if len(objectId) > 0:
             #leancloud.init("JdgetNRNLj7wvSs7wYs1hlNF-gzGzoHsz", master_key="bnPlVUIFezts6FwXmFPF0iHk")
             User = leancloud.Object.extend('_User')
             query = User.query
             user = query.get(objectId)
-        else :
+        else:
             user = leancloud.Object.extend('_User')()
-            user.set('password','password')
-        user.set('username',username)
-        user.set('mobilePhoneNumber',mobilePhoneNumber)
+            user.set('password', 'password')
+        user.set('username', username)
+        user.set('mobilePhoneNumber', mobilePhoneNumber)
         try:
             user.save()
         except LeanCloudError as e:
             raise BadGateway(e.error, e.code)
         else:
             return jsonify(success=True)
+
 
 @app.route('/api/groups', methods=['GET', 'POST'])
 @login_required
@@ -248,18 +238,171 @@ def apiGroups():
             name = request.get_json()['name']
         except KeyError:
             raise BadRequest(
-                '''receives malformed POST content (proper schema: '{"content": "TODO CONTENT"}')''') 
-        if len(objectId)>0:
+                '''receives malformed POST content ''')
+        if len(objectId) > 0:
             #leancloud.init("JdgetNRNLj7wvSs7wYs1hlNF-gzGzoHsz", master_key="bnPlVUIFezts6FwXmFPF0iHk")
             Item = leancloud.Object.extend('Group')
             query = Item.query
             item = query.get(objectId)
-        else :
+        else:
             item = leancloud.Object.extend('Group')()
-        item.set('name',name)
+        item.set('name', name)
         try:
             item.save()
         except LeanCloudError as e:
             raise BadGateway(e.error, e.code)
         else:
             return jsonify(success=True)
+
+
+@app.route('/api/endpoints', methods=['GET', 'POST'])
+@login_required
+def endpoints():
+    if request.method == 'GET':
+        try:
+            group = request.args.get('group')
+            if group  and len(group) > 0 and group!='null':
+                print(group)
+                Obj = leancloud.Object.extend('Group')
+                query = Obj.query
+                item = query.get(group)
+                #result_list = leancloud.Object.extend('Endpoint').query.equal_to('group', item).add_ascending('updatedAt').find()
+                result_list = leancloud.Query(leancloud.Object.extend(
+                    'Endpoint')).include('group').equal_to('group', item).descending('updatedAt').limit(1000).find()
+            else:
+                result_list = leancloud.Query(leancloud.Object.extend(
+                    'Endpoint')).include('group').descending('updatedAt').limit(1000).find()
+        except LeanCloudError as e:
+            if e.code == 101:  # 服务端对应的 Class 还没创建
+                return jsonify([])
+            else:
+                raise BadGateway(e.error, e.code)
+        else:
+            return jsonify([item.dump() for item in result_list])
+    elif request.method == 'POST':
+        try:
+            #content = request.get_json()['content']
+            print(request.get_json())
+            objectId = request.get_json()['objectId']
+            name = request.get_json()['name']
+            location = request.get_json()['location']
+            groupObjectId = request.get_json()['group']['objectId']
+        except KeyError:
+            raise BadRequest(
+                '''receives malformed POST content ''')
+        if len(objectId) > 0:
+            #leancloud.init("JdgetNRNLj7wvSs7wYs1hlNF-gzGzoHsz", master_key="bnPlVUIFezts6FwXmFPF0iHk")
+            Item = leancloud.Object.extend('Endpoint')
+            query = Item.query
+            item = query.get(objectId)
+        else:
+            item = leancloud.Object.extend('Endpoint')()
+        if len(groupObjectId)>0 :
+            Obj = leancloud.Object.extend('Group')
+            query = Obj.query
+            group = query.get(groupObjectId)
+            item.set('group',group)
+        item.set('name', name)
+        item.set('location', location)
+        try:
+            item.save()
+        except LeanCloudError as e:
+            raise BadGateway(e.error, e.code)
+        else:
+            return jsonify(success=True)
+
+@app.route('/api/userEndpoints', methods=['GET', 'POST'])
+@login_required
+def apiUserEndpoints():
+    if request.method == 'GET':
+        try:
+            endpointObjectId = request.args.get('endpoint')
+            Obj = leancloud.Object.extend('Endpoint')
+            query = Obj.query
+            endpoint = query.get(endpointObjectId)
+
+            user_query = leancloud.User.query
+
+            which_in_endpoint = leancloud.Object.extend('UserEndpoint').query.include('user').equal_to('endpoint', endpoint)
+            #user_query = user_query.and_(user_query, leancloud.User.query.matches_key_in_query('objectId', 'user.objectId', which_in_endpoint))
+            #user_query =  leancloud.User.query.matches_key_in_query('objectId', 'user.objectId', which_in_endpoint)
+            #user_query =  leancloud.User.query.contains_all('objectId', 'user.objectId', which_in_endpoint)
+            
+            user_list = which_in_endpoint.find()
+        except LeanCloudError as e:
+            if e.code == 101:  # 服务端对应的 Class 还没创建
+                return jsonify([])
+            else:
+                raise BadGateway(e.error, e.code)
+        else:
+            return jsonify([{
+                'username':user.get('user',{}).get('username'),
+                'mobilePhoneNumber':user.get('user',{}).get('mobilePhoneNumber'),
+                'objectId':user.get('objectId'),} for user in user_list])
+    elif request.method == 'POST':
+        try:
+            #content = request.get_json()['content']
+            print(request.get_json())
+            userObjectId = request.get_json()['userObjectId']
+            endpointObjectId = request.get_json()['endpointObjectId']
+        except KeyError:
+            raise BadRequest(
+                '''receives malformed POST content (proper schema: '{"content": "TODO CONTENT"}')''')
+        User = leancloud.Object.extend('_User')
+        query = User.query
+        user = query.get(userObjectId)
+        endpoint = leancloud.Object.extend('Endpoint').query.get(endpointObjectId)
+        userEndpoint = leancloud.Object.extend('UserEndpoint')()
+        userEndpoint.set('user',user)
+        userEndpoint.set('endpoint',endpoint)
+        try:
+            userEndpoint.save()
+        except LeanCloudError as e:
+            raise BadGateway(e.error, e.code)
+        else:
+            return jsonify(success=True)
+
+@app.route('/api/userEndpoints/delete', methods=['GET', 'POST'])
+@login_required
+def apiUserEndpointsDelete():
+    if request.method == 'GET':
+        return 
+    elif request.method == 'POST':
+        try:
+            #content = request.get_json()['content']
+            print(request.get_json())
+            objectId = request.get_json()['objectId']
+        except KeyError:
+            raise BadRequest(
+                '''receives malformed POST content (proper schema: '{"content": "TODO CONTENT"}')''')
+        item = leancloud.Object.extend('UserEndpoint').query.get(objectId)
+        try:
+            item.destroy()
+        except LeanCloudError as e:
+            raise BadGateway(e.error, e.code)
+        else:
+            return jsonify(success=True)
+
+
+
+@app.route('/users')
+@login_required
+def users():
+    return app.send_static_file('html/users.html')
+
+
+@app.route('/groups')
+@login_required
+def groups():
+    return app.send_static_file('html/groups.html')
+
+
+@app.route('/endpoints')
+@login_required
+def endPoints():
+    return app.send_static_file('html/endpoints.html')
+
+@app.route('/userEndpoints')
+@login_required
+def userEndPoints():
+    return app.send_static_file('html/userEndpoints.html')

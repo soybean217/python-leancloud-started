@@ -19,16 +19,19 @@
       <input type="button" value="add" onclick='javascript:openAddNew()' />
     </form>
     <ul>
-      <el-table v-loading="loading" id="t1" :data="tableData" highlight-current-row style="width: 100%">
+      <el-table v-loading="loading" id="t1" :data="tableData" highlight-current-row
+         style="width: 100%">
         <el-table-column prop="createdAt.iso" label="创建日期">
         </el-table-column>
         <el-table-column prop="updatedAt.iso" label="更新日期">
         </el-table-column>
         <el-table-column prop="name" label="名称">
         </el-table-column>
+        <el-table-column prop="location" label="地址">
+        </el-table-column>
         <el-table-column fixed="right" label="操作" width="100">
           <template slot-scope="scope">
-            <el-button @click="handleClick(scope.row)" type="text" size="small">店铺</el-button>
+            <el-button @click="handleClick(scope.row)" type="text" size="small">店员</el-button>
             <el-button type="text" size="small" @click="handleCurrentChange(scope.row)">编辑</el-button>
           </template>
         </el-table-column>
@@ -37,10 +40,19 @@
     <ul>
 
     </ul>
-    <el-dialog id='d1' title="group" :visible.sync="dialogFormVisible">
+    <el-dialog id='d1' title="add" :visible.sync="dialogFormVisible">
       <el-form :model="form">
         <el-form-item label="名称" :label-width="formLabelWidth">
           <el-input v-model="form.name" autocomplete="off"></el-input>
+        </el-form-item>
+        <el-form-item label="地址" :label-width="formLabelWidth">
+          <el-input v-model="form.location" autocomplete="off"></el-input>
+        </el-form-item>
+        <el-form-item label="组织" :label-width="formLabelWidth">
+          <el-select v-model="form.group.objectId" clearable placeholder="请选择" >
+            <el-option v-for="item of options" :key="item.value" :label="item.label" :value="item.value">
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="id" v-if="form.objectId" :label-width="formLabelWidth">
           <el-input v-model="form.objectId" disabled></el-input>
@@ -63,11 +75,15 @@
       methods: {
         handleClick(val) {
           console.log(val);
-          location='endpoints?group='+val.objectId
+          location='userEndpoints?endpoint='+val.objectId
         },
         handleCurrentChange(val) {
           console.log(val)
           d1.form.name = val.name
+          d1.form.location = val.location
+          if (val.group && val.group.objectId) {
+            d1.form.group.objectId = val.group.objectId
+          }
           d1.form.objectId = val.objectId
           d1.dialogFormVisible = true
         }
@@ -79,6 +95,8 @@
         dialogFormVisible: false,
         form: {
           name: '',
+          location: '',
+          group: { objectId: '' },
           username: '',
           mobilePhoneNumber: '',
           region: '',
@@ -89,7 +107,9 @@
           resource: '',
           desc: ''
         },
-        formLabelWidth: '120px'
+        formLabelWidth: '120px',
+        options: [],
+        value: ''
       },
       methods: {
         handleSubmit() {
@@ -97,7 +117,7 @@
           console.log(JSON.stringify(d1.form))
           axios({
             method: 'post',
-            url: '/api/groups',
+            url: '/api/endpoints',
             data: JSON.stringify(d1.form),
             headers:
             {
@@ -116,18 +136,39 @@
 
     function openAddNew() {
       d1.form.name = ''
+      d1.form.location = ''
+      d1.form.group.objectId = ''
       d1.form.objectId = ''
       d1.dialogFormVisible = true
     }
 
     window.onload = function () {
+      t1.loading = true;
+      loadGroup()
       loadData();
     }
-    function loadData() {
-      t1.loading = true;
+    function loadGroup() {
       axios({
         method: 'get',
         url: '/api/groups'
+      }).then(function (resp) {
+        d1.options = []
+        for (item of resp.data) {
+          option = {}
+          option.value = item.objectId
+          option.label = item.name
+          d1.options.push(option)
+        }
+      }).catch(resp => {
+        console.log('请求失败：' + resp.status + ',' + resp.statusText);
+      });
+    }
+    function loadData() {
+      t1.loading = true;
+      group = getUrlParam('group')
+      axios({
+        method: 'get',
+        url: '/api/endpoints?group=' + group
       }).then(function (resp) {
         console.log(resp.data);
         t1.tableData = resp.data

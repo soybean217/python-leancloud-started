@@ -1,0 +1,207 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+  <title>users</title>
+  <link rel="stylesheet" href="/static/style.css" type="text/css">
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/element-ui@2.11.0/lib/theme-chalk/index.css">
+  <script src="https://unpkg.com/element-ui@2.11.0/lib/index.js"></script>
+</head>
+
+<body>
+  <div id="container">
+    <h1>
+      <script src="/static/nav.js"></script>
+    </h1>
+    <form action="/todos" method="POST">
+      <el-select id='s1' v-model="value" filterable placeholder="请选择">
+        <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value">
+        </el-option>
+      </el-select>
+      <input type="button" value="add user" onclick='javascript:openAddNew()' />
+    </form>
+    <ul>
+      <el-table v-loading="loading" id="t1" :data="tableData" highlight-current-row style="width: 100%">
+        <el-table-column prop="username" label="用户名">
+        </el-table-column>
+        <el-table-column prop="mobilePhoneNumber" label="手机">
+        </el-table-column>
+        <el-table-column fixed="right" label="操作" width="100">
+          <template slot-scope="scope">
+            <el-button @click="handleClick(scope.row)" type="text" size="small">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </ul>
+    <ul>
+
+    </ul>
+    <el-dialog id='d1' title="用户" :visible.sync="dialogFormVisible">
+      <el-form :model="form">
+        <el-form-item label="用户名" :label-width="formLabelWidth">
+          <el-input v-model="form.username" autocomplete="off"></el-input>
+        </el-form-item>
+        <el-form-item label="手机号" :label-width="formLabelWidth">
+          <el-input v-model="form.mobilePhoneNumber" autocomplete="off"></el-input>
+        </el-form-item>
+        <el-form-item label="id" v-if="form.objectId" :label-width="formLabelWidth">
+          <el-input v-model="form.objectId" disabled></el-input>
+        </el-form-item>
+
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="dialogFormVisible = false">取 消</el-button>
+        <el-button type="primary" @click="handleSubmitUser">确 定</el-button>
+      </div>
+    </el-dialog>
+
+  </div>
+  <script>
+    var s1 = new Vue({
+      el: '#s1',
+      data: {
+        options: [],
+        value: ''
+      },
+    })
+    var t1 = new Vue({
+      el: '#t1',
+      data: {
+        tableData: [],
+        loading: true
+      },
+      methods: {
+        handleClick(val) {
+          console.log(val);
+
+          postData = {
+            'objectId': val.objectId,
+          }
+          axios({
+            method: 'post',
+            url: '/api/userEndpoints/delete',
+            data: JSON.stringify(postData),
+            headers:
+            {
+              'Content-Type': 'application/json'
+            }
+          }).then(resp => {
+            console.log(resp.data);
+            d1.dialogFormVisible = false
+            loadUsers()
+          }).catch(err => {
+            console.log('请求失败：' + err.status + ',' + err.statusText);
+          });
+        },
+        handleCurrentChange(val) {
+          console.log(val)
+          d1.form.username = val.username
+          d1.form.mobilePhoneNumber = val.mobilePhoneNumber
+          d1.form.objectId = val.objectId
+          d1.dialogFormVisible = true
+        }
+      }
+    })
+    var d1 = new Vue({
+      el: '#d1',
+      data: {
+        dialogFormVisible: false,
+        form: {
+          name: '',
+          username: '',
+          mobilePhoneNumber: '',
+          region: '',
+          date1: '',
+          date2: '',
+          delivery: false,
+          type: [],
+          resource: '',
+          desc: ''
+        },
+        formLabelWidth: '120px'
+      },
+      methods: {
+        handleSubmitUser() {
+          axios({
+            method: 'post',
+            url: '/api/users',
+            data: JSON.stringify(d1.form),
+            headers:
+            {
+              'Content-Type': 'application/json'
+            }
+          }).then(resp => {
+            console.log(resp.data);
+            d1.dialogFormVisible = false
+            loadUsers()
+          }).catch(err => {
+            console.log('请求失败：' + err.status + ',' + err.statusText);
+          });
+        }
+      }
+    })
+
+    function openAddNew() {
+      postData = {
+        'userObjectId': s1.value,
+        'endpointObjectId': getUrlParam('endpoint')
+      }
+      axios({
+        method: 'post',
+        url: '/api/userEndpoints',
+        data: JSON.stringify(postData),
+        headers:
+        {
+          'Content-Type': 'application/json'
+        }
+      }).then(resp => {
+        console.log(resp.data);
+        d1.dialogFormVisible = false
+        loadUsers()
+      }).catch(err => {
+        console.log('请求失败：' + err.status + ',' + err.statusText);
+      });
+    }
+
+    window.onload = function () {
+      loadUsers();
+      loadAllUsers();
+    }
+    function loadUsers() {
+      t1.loading = true;
+      axios({
+        method: 'get',
+        url: '/api/userEndpoints?endpoint=' + getUrlParam('endpoint')
+      }).then(function (resp) {
+        console.log(resp.data);
+        t1.tableData = resp.data
+        t1.loading = false;
+      }).catch(resp => {
+        console.log('请求失败：' + resp.status + ',' + resp.statusText);
+      });
+    }
+    function loadAllUsers() {
+      t1.loading = true;
+      axios({
+        method: 'get',
+        url: '/api/users'
+      }).then(function (resp) {
+        console.log(resp.data);
+        s1.options = []
+        for (i of resp.data) {
+          j = {}
+          j.value = i.objectId
+          j.label = i.username
+          s1.options.push(j)
+        }
+        t1.loading = false;
+      }).catch(resp => {
+        console.log('请求失败：' + resp.status + ',' + resp.statusText);
+      });
+    }
+  </script>
+</body>
+
+</html>
