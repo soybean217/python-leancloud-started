@@ -180,7 +180,7 @@ def apiUsers():
     if request.method == 'GET':
         try:
             user_list = leancloud.Query(leancloud.Object.extend(
-                '_User')).descending('updatedAt').limit(1000).find()
+                '_User')).include('Role').descending('updatedAt').limit(1000).find()
         except LeanCloudError as e:
             if e.code == 101:  # 服务端对应的 Class 还没创建
                 return jsonify([])
@@ -194,6 +194,7 @@ def apiUsers():
             print(request.get_json())
             objectId = request.get_json()['objectId']
             username = request.get_json()['username']
+            roleList = request.get_json()['roleList']
             mobilePhoneNumber = request.get_json()['mobilePhoneNumber']
         except KeyError:
             raise BadRequest(
@@ -210,10 +211,64 @@ def apiUsers():
         user.set('mobilePhoneNumber', mobilePhoneNumber)
         try:
             user.save()
+            role_query = leancloud.Query(leancloud.Role)
+            role_query_list = role_query.find()
+            for role in role_query_list:
+                print(role.dump())
+                if role.get('name') in roleList :
+                    relation = role.get_users()
+                    relation.add(user)
+                    role.save()
+                else:
+                    role_query.equal_to('users', user)
+                    role_query_with_current_user = role_query.find()
+                    if len(role_query_with_current_user) > 0:
+                        relation = role.get_users()
+                        relation.remove(user)
+                        role.save()
         except LeanCloudError as e:
             raise BadGateway(e.error, e.code)
         else:
             return jsonify(success=True)
+
+@app.route('/api/roles', methods=['GET', 'POST'])
+@login_required
+def apiRoles():
+    if request.method == 'GET':
+        try:
+            role_query = leancloud.Query(leancloud.Role)
+            role_query_list = role_query.find()
+        except LeanCloudError as e:
+            if e.code == 101:  # 服务端对应的 Class 还没创建
+                return jsonify([])
+            else:
+                raise BadGateway(e.error, e.code)
+        else:
+            return jsonify([item.dump() for item in role_query_list])
+    elif request.method == 'POST':
+        return jsonify(success=True)
+
+@app.route('/api/userRoles', methods=['GET', 'POST'])
+@login_required
+def apiUserRoles():
+    if request.method == 'GET':
+        try:
+            userObjectId = request.args.get('userObjectId')
+            User = leancloud.Object.extend('_User')
+            query = User.query
+            user = query.get(userObjectId)
+            role_query = leancloud.Query(leancloud.Role)
+            role_query.equal_to('users', user)
+            role_query_list = role_query.find() 
+        except LeanCloudError as e:
+            if e.code == 101:  # 服务端对应的 Class 还没创建
+                return jsonify([])
+            else:
+                raise BadGateway(e.error, e.code)
+        else:
+            return jsonify([item.dump() for item in role_query_list])
+    elif request.method == 'POST':
+        return jsonify(success=True)
 
 
 @app.route('/api/groups', methods=['GET', 'POST'])
@@ -396,7 +451,6 @@ def users():
 def groups():
     return app.send_static_file('html/groups.html')
 
-
 @app.route('/endpoints')
 @login_required
 def endPoints():
@@ -406,3 +460,4 @@ def endPoints():
 @login_required
 def userEndPoints():
     return app.send_static_file('html/userEndpoints.html')
+
