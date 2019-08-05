@@ -72,7 +72,8 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    # return render_template('index.html')
+    return redirect(url_for('users'))
 
 
 @app.route('/time')
